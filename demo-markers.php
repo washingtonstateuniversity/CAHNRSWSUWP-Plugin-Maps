@@ -2,6 +2,18 @@
 
 header( 'Content-Type: application/json' );
 
+$icons = array(
+	'large_cougar' => array(
+		'icon_url'       => 'large-cougar-pin.png',
+		//'shadow_url'     => 'leaf-shadow.png',
+		'icon_size'      => array( 38, 95 ), // size of the icon
+		'shadow_size'    => array( 50, 64 ), // size of the shadow
+		'icon_anchor'    => array( 22, 94 ), // point of the icon which will correspond to marker's location
+		'shadow_anchor'  => array( 4, 62 ),  // the same for the shadow
+		'popup_anchor'   => array( -3, -76 ), // point from which the popup should open relative to the iconAnchor
+	),
+);
+
 $markers = array(
 	array(
 		'icon'          => 'default',
@@ -41,8 +53,13 @@ $markers = array(
 	),
 );
 
-$markers_json = wp_json_encode( $markers );
+$map = array(
+	'icons'    => $icons,
+	'markers'  => $markers,
+);
 
-echo $markers_json;
+$map_json = wp_json_encode( $map );
+
+echo $map_json;
 
 die();

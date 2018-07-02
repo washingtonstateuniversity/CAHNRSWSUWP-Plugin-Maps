@@ -52,19 +52,17 @@
 				// @var instance of Leaflet map
 				this.map = false;
 
-				// @var array All markers avaialbe to the map
-				this.locations = [];
+				// @var array Map data
+				this.map_data = [];
 
-				// @var array Markers used in the current map
-				this.current_locations = [];
-
-				// @var array Visible Markers
+				// @var array all Map Markers
 				this.markers = [];
 
 				// @var string|bool URL for request
 				this.request_url = 'http://local-cahnrs.wsu.edu/maps/map/?map-json=true';
 
 				this.marker_query = {
+					do_query: true,
 					categories:[],
 					tags:[],
 					taxonomy_relation: 'OR',
@@ -78,12 +76,37 @@
 				 */
 				this.init_map = function() {
 
-					this.get_markers( 'set_map' );
+					//this.map_data = this.get_map_data( 'set_map' );
+
+					this.setup_map();
 
 				} // End init_map
 
 
-				this.set_marker_query = function() {
+
+				this.setup_map = function() {
+
+					this.set_map();
+
+					this.set_map_query();
+
+					this.set_map_data( self.update_map );
+
+				} // End setup_map
+
+
+				/**
+				 * Handles creation of the map.
+				 * Sets this.map property
+				 */
+				this.set_map = function() {
+
+					this.map = L.map( this.map_id ).setView([51.505, -0.09], 13);
+
+				}  // End create_map
+
+
+				this.set_map_query = function() {
 
 					category_data = this.j_map.data('categories');
 
@@ -112,6 +135,177 @@
 				} // End set_query
 
 
+				/**
+				 * Set Map data from JSON call
+				 */
+				this.set_map_data = function( callback ) {
+
+					var self = this;
+
+					jQuery.get( 
+						this.request_url, 
+						function( data ) {
+							self.map_data = data;
+							callback( data );
+						},
+						'JSON'
+					);
+
+				} // End set_map_data
+
+				this.get_markers = function( ) {
+
+					var locations = this.get_map_data( 'markers' );
+
+					var query = this.marker_query;
+
+					if ( query.do_query ) {
+
+						locations = this.get_locations_by_query( locations, query );
+
+					} // End if
+
+					console.log( locations );
+
+					return locations;
+
+				} // End get_markers
+
+
+				this.update_map = function() {
+
+					markers = self.get_markers();
+
+				}
+
+
+				this.get_locations_by_query = function( locations, query ) {
+
+					// Has set categories or tags
+					if ( query.categories.length || query.tags.length ) {
+
+						for ( var i = 0; i < locations.length; i++ ) {
+
+							var location = locations[i];
+
+							var has_categories = this.check_has_taxonomy_term( query.categories, location.taxonomies.categories, query.term_relation );
+
+							var has_tags = this.check_has_taxonomy_term( query.tags, location.taxonomies.tags, query.term_relation );
+
+							if ( 'AND' === this.marker_query.taxonomy_relation && query.categories.length && query.tags.length ) {
+
+								if ( ! has_categories || ! has_tags ) {
+
+									locations.splice( i, 1 );
+
+								} // End if
+
+							} else {
+
+								if ( ! has_categories && ! has_tags ) {
+
+									locations.splice( i, 1 );
+
+								} // End if
+
+							} // End if
+
+						} // End for
+
+					} // End if
+
+					return locations;
+
+				} // End 
+
+
+				this.check_has_taxonomy_term = function( query_terms, marker_terms, term_relation ) {
+
+					var has_terms = false;
+
+					if ( marker_terms.length ) {
+
+						if ( 'AND' === term_relation ) {
+
+							has_terms = true;
+
+							for ( var c = 0; c < query_terms.length; c++ ) {
+
+								if ( marker_terms.indexOf( query_terms[ c ] ) == -1 ) {
+
+									has_terms = false;
+
+									break;
+
+								} // End if
+
+							} // End for
+
+						} else {
+
+							for ( var c = 0; c < query_terms.length; c++ ) {
+
+								if ( marker_terms.indexOf( query_terms[ c ] ) !== -1 ) {
+
+									has_terms = true;
+
+									break;
+
+								} // End if
+
+							} // End for
+
+						} // End if
+
+					} // End if
+
+					return has_terms;
+
+				} // End check_has_taxonomy_term
+
+					// Start the map build
+				this.init_map();
+
+
+
+				//	***********************************************************************************
+
+
+
+				/**
+				 * Builds the map from the given id
+				 */
+				//this.init_map = function() {
+
+					//this.get_markers( 'set_map' );
+
+					//this.set_map_data( 'set_map' );
+
+				//} // End init_map
+
+
+				/**
+				 * Set Map data from JSON call
+				 */
+				/*this.set_map_data = function( callback ) {
+
+					var self = this;
+
+					jQuery.get( 
+						this.request_url, 
+						function( data ) {
+							self.map_data = data;
+							console.log( callback );
+							self[ callback ]( data );
+						},
+						'JSON'
+					);
+
+				} // End set_map_data*/
+
+				
+
+
 				this.remove_markers = function() {
 
 					alert( 'removed');
@@ -125,9 +319,11 @@
 				} // End remove_markers
 
 
-				this.set_current_locations = function() {
+				this.get_query_markers = function () {
 
-					this.current_locations = [];
+					var markers = [];
+
+					var data_markers = this.get_data( 'markers' );
 
 					var cats = this.marker_query.categories;
 
@@ -136,9 +332,61 @@
 					// Has set categories or tags
 					if ( cats.length || tags.length ) {
 
-						for ( var i = 0; i < this.locations.length; i++ ) {
+						for ( var i = 0; i < data_markers.length; i++ ) {
 
-							var marker = this.locations[ i ];
+							var marker = data_markers[ i ];
+
+							var has_cat = this.check_has_taxonomy_term( cats, marker.taxonomies.categories, this.marker_query.term_relation );
+
+							var has_tag = this.check_has_taxonomy_term( tags, marker.taxonomies.tags, this.marker_query.term_relation );
+
+							if ( 'AND' === this.marker_query.taxonomy_relation ) {
+
+								if ( has_cat && has_tag ) {
+
+									markers.push( marker );
+
+								} // End if
+
+							} else {
+
+								if ( has_cat || has_tag ) {
+
+									markers.push( marker );
+
+								} // End if
+
+							} // End if
+
+						} // End for
+
+					} else {
+
+						markers = data_markers;
+
+					} // End if
+
+					return markers;
+
+				} // End 
+
+
+				this.set_current_locations = function() {
+
+					this.current_locations = [];
+
+					var cats = this.marker_query.categories;
+
+					var tags = this.marker_query.tags;
+
+					var data_markers = this.get_data( 'markers' );
+
+					// Has set categories or tags
+					if ( cats.length || tags.length ) {
+
+						for ( var i = 0; i < data_markers.length; i++ ) {
+
+							var marker = data_markers[ i ];
 
 							var has_cat = this.check_has_taxonomy_term( cats, marker.taxonomies.categories, this.marker_query.term_relation );
 
@@ -216,19 +464,37 @@
 
 				} // End check_has_taxonomy_term
 
-				this.set_map = function() {
+				//this.set_map = function() {
 
-					this.create_map();
+					//this.create_map();
 
-					this.set_tile_layer();
+					//this.set_tile_layer();
 
-					this.set_marker_query();
+					//var query = this.get_marker_query();
 
-					this.set_current_locations();
+					//this.set_marker_query();
 
-					this.add_markers();
+					//this.set_current_locations();
 
-				} // End set_map
+					//this.add_markers();
+
+				//} // End set_map
+
+
+
+
+				this.get_data = function( type ) {
+
+					switch ( type ) {
+
+						case 'markers':
+							return this.map_data['markers'];
+
+					} // End switch
+
+					return [];
+
+				} // End get_data
 
 				/**
 				 * Handles creation of the map.
@@ -284,7 +550,7 @@
 				/**
 				 * Do JSON Request and return markers
 				 */
-				this.get_markers = function( callback ) {
+				/*this.get_markers = function( callback ) {
 
 					var self = this;
 
@@ -298,7 +564,7 @@
 						'JSON'
 					);
 
-				} // End get_markers
+				} // End get_markers */
 
 				// Start the map build
 				this.init_map();
